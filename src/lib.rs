@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
-pub mod interpreter;
-pub mod model;
+pub mod compiler;
+pub mod eval;
 pub mod parser;
 pub mod utils;
 
@@ -11,30 +11,44 @@ pub use default_environment::default_env;
 #[macro_use]
 mod macros;
 
-use model::Env;
-use std::io::{self, prelude::*};
-use std::{cell::RefCell, rc::Rc};
-
-// 🦀 I am all over this project!
-/// Starts a REPL prompt at stdin/stdout. **This will block the current thread.**
-pub fn start_repl(env: Option<Env>) {
-    let env_rc = Rc::new(RefCell::new(env.unwrap_or_else(default_env)));
-
-    print!("> ");
-    io::stdout().flush().unwrap();
-    for line in io::stdin().lock().lines() {
-        match interpreter::eval_block(
-            env_rc.clone(),
-            parser::parse(&line.unwrap()).filter_map(|a| a.ok()),
-        ) {
-            Ok(val) => println!("{}", val),
-            Err(e) => println!("{}", e),
-        };
-
-        print!("> ");
-        io::stdout().flush().unwrap();
+use cfg_if::cfg_if;
+cfg_if! {
+    if #[cfg(feature = "bigint")] {
+        use num_bigint::BigInt;
     }
-
-    // Properly go to the next line after quitting
-    println!();
 }
+
+cfg_if! {
+    if      #[cfg(feature = "bigint")] { pub type IntType = BigInt; }
+    else if #[cfg(feature = "i128")]   { pub type IntType = i128;   }
+    else if #[cfg(feature = "i64")]    { pub type IntType = i64;    }
+    else if #[cfg(feature = "i16")]    { pub type IntType = i16;    }
+    else if #[cfg(feature = "i8")]     { pub type IntType = i8;     }
+    else                               {
+        /// The underlying type to use for storing lisp integers. Controlled via feature-flags.
+        pub type IntType = i32;
+    }
+}
+
+cfg_if! {
+    if #[cfg(feature = "f64")] { pub type FloatType = f64; }
+    else                       {
+        /// The underlying type to use for storing lisp floats. Controlled via feature-flags.
+        pub type FloatType = f32;
+    }
+}
+
+mod env;
+mod errors;
+mod lambda;
+mod list;
+mod symbol;
+mod value;
+
+pub use env::Env;
+pub use errors::{CompileError, RuntimeError};
+pub use lambda::Lambda;
+pub use list::ConsIterator;
+pub use list::List;
+pub use symbol::Symbol;
+pub use value::{HashMapRc, NativeFunc, Value};

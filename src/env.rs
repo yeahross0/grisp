@@ -1,12 +1,15 @@
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::rc::Rc;
-use std::{collections::HashMap, fmt::Debug};
+
+//use std::collections::HashMap;
+use halfbrown::HashMap;
 
 use super::{RuntimeError, Symbol, Value};
 
 /// An environment of symbol bindings. Used for the base environment, for
 /// closures, for `let` statements, for function arguments, etc.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Env {
     parent: Option<Rc<RefCell<Env>>>,
     entries: HashMap<Symbol, Value>,
@@ -29,10 +32,21 @@ impl Env {
         }
     }
 
+    pub fn extend_self(&mut self, parent: Rc<RefCell<Env>>) {
+        *self = Self {
+            parent: Some(parent),
+            entries: HashMap::new(),
+        }
+    }
+
+    pub fn popped_scope(&self) -> Option<Rc<RefCell<Env>>> {
+        self.parent.clone()
+    }
+
     /// Walks up the environment hierarchy until it finds the symbol's value or
     /// runs out of environments.
     pub fn get(&self, key: &Symbol) -> Option<Value> {
-        if let Some(val) = self.entries.get(&key) {
+        if let Some(val) = self.entries.get(key) {
             Some(val.clone()) // clone the Rc
         } else if let Some(parent) = &self.parent {
             parent.borrow().get(key)
@@ -44,6 +58,14 @@ impl Env {
     /// Define a new key in the current environment
     pub fn define(&mut self, key: Symbol, value: Value) {
         self.entries.insert(key, value);
+    }
+
+    pub fn retain(&mut self, key: Symbol) {
+        self.entries.retain(|k, _| *k == key);
+    }
+
+    pub fn clear_now(&mut self) {
+        self.entries.clear();
     }
 
     /// Find the environment where this key is defined, and update its value.

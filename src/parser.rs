@@ -1,6 +1,5 @@
 use crate::{
-    lisp,
-    model::{FloatType, IntType, List, Symbol, Value},
+    lisp, {FloatType, IntType, List, Symbol, Value},
 };
 
 use std::fmt::Display;
@@ -34,6 +33,7 @@ pub fn parse(code: &str) -> impl Iterator<Item = Result<Value, ParseError>> + '_
 enum ParseTree {
     Atom(Value),
     List(Vec<ParseTree>),
+    Quasiquoted(Box<ParseTree>),
     Quoted(Box<ParseTree>),
     Comma(Box<ParseTree>),
 }
@@ -47,6 +47,7 @@ impl ParseTree {
                     .map(|parse_tree| parse_tree.into_value())
                     .collect::<List>(),
             ),
+            ParseTree::Quasiquoted(inner) => lisp! { (quasiquote {inner.into_value()}) },
             ParseTree::Quoted(inner) => lisp! { (quote {inner.into_value()}) },
             ParseTree::Comma(inner) => lisp! { (comma {inner.into_value()}) },
         }
@@ -64,7 +65,7 @@ pub struct ParseError {
 
 impl Display for ParseError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        return write!(formatter, "Parse error: {}", self.msg);
+        write!(formatter, "Parse error: {}", self.msg)
     }
 }
 
@@ -119,6 +120,7 @@ fn parse_list(code: &str, index: usize) -> ParseResult {
 
 fn parse_atom(code: &str, index: usize) -> ParseResult {
     for func in [
+        parse_quasiquoted,
         parse_quoted,
         parse_comma,
         parse_nil,
@@ -136,6 +138,20 @@ fn parse_atom(code: &str, index: usize) -> ParseResult {
     }
 
     None
+}
+
+fn parse_quasiquoted(code: &str, index: usize) -> ParseResult {
+    let index = consume(code, index, "`")?;
+    let res = parse_expression(code, index)?;
+
+    if let Ok(ParsedAndIndex { parsed, index }) = res {
+        Some(Ok(ParsedAndIndex {
+            parsed: ParseTree::Quasiquoted(Box::new(parsed)),
+            index,
+        }))
+    } else {
+        Some(res)
+    }
 }
 
 fn parse_quoted(code: &str, index: usize) -> ParseResult {
@@ -180,7 +196,7 @@ fn parse_nil(code: &str, index: usize) -> ParseResult {
 }
 
 fn parse_false(code: &str, index: usize) -> ParseResult {
-    let index = consume(code, index, "f")?;
+    let index = consume(code, index, "#f")?;
 
     if next_char_is_break(code, index) {
         Some(Ok(ParsedAndIndex {
@@ -193,7 +209,7 @@ fn parse_false(code: &str, index: usize) -> ParseResult {
 }
 
 fn parse_true(code: &str, index: usize) -> ParseResult {
-    let index = consume(code, index, "t")?;
+    let index = consume(code, index, "#t")?;
 
     if next_char_is_break(code, index) {
         Some(Ok(ParsedAndIndex {
@@ -291,8 +307,8 @@ fn parse_symbol(code: &str, index: usize) -> ParseResult {
 
     if last_index > index {
         Some(Ok(ParsedAndIndex {
-            parsed: ParseTree::Atom(Value::Symbol(Symbol(
-                code.get(index..last_index).unwrap_or("").to_owned(),
+            parsed: ParseTree::Atom(Value::Symbol(Symbol::from_ref(
+                code.get(index..last_index).unwrap_or(""),
             ))),
             index: last_index,
         }))
@@ -310,23 +326,23 @@ fn consume(code: &str, index: usize, s: &str) -> ConsumeResult {
             .zip(s.chars())
             .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
     {
-        return Some(index + s.len());
+        Some(index + s.len())
     } else {
-        return None;
+        None
     }
 }
 
 fn consume_whitespace_and_comments(code: &str, index: usize) -> usize {
-    let mut semicolons = 0;
+    let mut semicolons = false;
 
     consume_while(code, index, move |(_, ch)| {
         if ch == ';' {
-            semicolons += 1;
-        } else if semicolons < 2 || ch == '\n' {
-            semicolons = 0;
+            semicolons = true;
+        } else if semicolons == false || ch == '\n' {
+            semicolons = false;
         }
 
-        return ch.is_whitespace() || ch == ';' || semicolons >= 2;
+        ch.is_whitespace() || ch == ';' || semicolons
     })
     .map(|(index, _)| index + 1)
     .unwrap_or(index)
@@ -355,8 +371,8 @@ fn is_symbolic(c: char) -> bool {
 
 fn next_char_is_break(code: &str, index: usize) -> bool {
     code.get(index..)
-        .map(|s| s.chars().next())
-        .flatten()
+        .and_then(|s| s.chars().next())
+        //.flatten()
         .map(|ch| ch.is_whitespace() || SPECIAL_TOKENS.iter().any(|t| *t == ch))
         .unwrap_or(true)
 }

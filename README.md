@@ -1,6 +1,14 @@
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/brundonsmith/rust_lisp/rust.yml?branch=master)](https://github.com/brundonsmith/rust_lisp/actions)
-[![rust_lisp shield](https://img.shields.io/crates/v/rust_lisp)](https://crates.io/crates/rust_lisp)
-[![docs.rs](https://img.shields.io/docsrs/rust_lisp/latest)](https://docs.rs/rust_lisp/latest/rust_lisp/)
+A fork of rust_lisp. Intended to be used in the Lisp Spring Game Jam.
+Compiles to bytecode based on this guide: https://bernsteinbear.com/blog/bytecode-interpreters/
+
+The changes to this project were hastily put together before the game jam so aren't documented or entirely tested. There are random panics thrown at various parts of the code.
+
+Breaks from the goals of the original project and adds random dependencies
+and breaks lisp! macro. There are reasonable improvements too, like interning symbols.
+
+LICENCE of original project is MIT, as is this.
+
+The original README is provided below (Contents out of date).
 
 # What is this?
 

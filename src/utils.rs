@@ -1,6 +1,8 @@
 use std::{any::Any, rc::Rc};
 
-use crate::model::{FloatType, HashMapRc, IntType, List, RuntimeError, Symbol, Value};
+use im::Vector;
+
+use crate::{FloatType, HashMapRc, IntType, List, RuntimeError, Symbol, Value};
 
 /// Given a `Value` assumed to be a `Value::List()`, grab the item at `index`
 /// and err if there isn't one.
@@ -73,6 +75,12 @@ impl TypeName for &Symbol {
 impl TypeName for &List {
     fn get_name() -> &'static str {
         "list"
+    }
+}
+
+impl TypeName for &Vector<Value> {
+    fn get_name() -> &'static str {
+        "vector"
     }
 }
 

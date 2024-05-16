@@ -1,8 +1,7 @@
 use rust_lisp::{
-    default_env,
-    interpreter::eval,
-    lisp,
-    model::{IntType, Value},
+    default_env, lisp,
+    {compiler::compile, eval::op_eval},
+    {IntType, Value},
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -71,7 +70,7 @@ fn filter() {
     assert_eq!(
         eval_ast(lisp! {
             (filter
-                (lambda (x) (== x "foo"))
+                (lambda (x) (= x "foo"))
                 (list "foo" "bar" "a" "b" "foo"))
         }),
         eval_ast(lisp! {
@@ -124,26 +123,26 @@ fn number_cast_comparisons() {
         eval_ast(lisp! {
             (< 0 0.1)
         }),
-        lisp! { T }
+        Value::True
     );
 
     assert_eq!(
         eval_ast(lisp! {
             (< { Value::Int((-2).into()) } 1)
         }),
-        lisp! { T }
+        Value::True
     );
 
     assert_eq!(
         eval_ast(lisp! {
             (>= { Value::Float(-2.1) } 1)
         }),
-        lisp! { F }
+        Value::False
     );
 }
 
 #[cfg(test)]
 fn eval_ast(ast: Value) -> Value {
     let env = Rc::new(RefCell::new(default_env()));
-    return eval(env, &ast).unwrap();
+    return op_eval(&compile(ast).unwrap(), env).unwrap();
 }

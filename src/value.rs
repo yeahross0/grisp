@@ -1,4 +1,5 @@
 use cfg_if::cfg_if;
+use im::Vector;
 use std::any::Any;
 use std::ops::{Add, Div, Mul, Sub};
 use std::rc::Rc;
@@ -13,6 +14,7 @@ cfg_if! {
 }
 
 use super::{Env, FloatType, IntType, Lambda, List, RuntimeError, Symbol};
+use crate::compiler::Opcode;
 use crate::lisp;
 
 /// `Value` encompasses all possible Lisp values, including atoms, lists, and
@@ -26,6 +28,7 @@ pub enum Value {
     String(String),
     Symbol(Symbol),
     List(List),
+    Vector(Vector<Value>),
     HashMap(HashMapRc),
 
     /// A native Rust function that can be called from lisp code
@@ -33,9 +36,7 @@ pub enum Value {
 
     /// A native Rust closure that can be called from lisp code (the closure
     /// can capture things from its Rust environment)
-    NativeClosure(
-        Rc<RefCell<dyn FnMut(Rc<RefCell<Env>>, Vec<Value>) -> Result<Value, RuntimeError>>>,
-    ),
+    NativeClosure(NativeClosure),
 
     /// A lisp function defined in lisp
     Lambda(Lambda),
@@ -51,10 +52,15 @@ pub enum Value {
         func: Rc<Value>,
         args: Vec<Value>,
     },
+
+    ///For bytecode. Internal use only!
+    Bytecode(Rc<Vec<Opcode>>),
 }
 
 /// A Rust function that is to be called from lisp code
 pub type NativeFunc = fn(env: Rc<RefCell<Env>>, args: Vec<Value>) -> Result<Value, RuntimeError>;
+pub type NativeClosure =
+    Rc<RefCell<dyn FnMut(Rc<RefCell<Env>>, Vec<Value>) -> Result<Value, RuntimeError>>>;
 
 /// Alias for the contents of Value::HashMap
 pub type HashMapRc = Rc<RefCell<HashMap<Value, Value>>>;
@@ -68,17 +74,19 @@ impl Value {
             Value::NativeClosure(_) => "function",
             Value::Lambda(_) => "function",
             Value::Macro(_) => "macro",
-            Value::True => "T",
-            Value::False => "F",
+            Value::True => "#t",
+            Value::False => "#f",
             Value::String(_) => "string",
             Value::List(List::NIL) => "nil",
             Value::List(_) => "list",
+            Value::Vector(_) => "vector",
             Value::HashMap(_) => "hash map",
             Value::Int(_) => "integer",
             Value::Float(_) => "float",
             Value::Symbol(_) => "symbol",
             Value::Foreign(_) => "foreign value",
             Value::TailCall { func: _, args: _ } => "tail call",
+            Value::Bytecode(_) => "bytecode",
         }
     }
 }
@@ -109,7 +117,7 @@ impl TryFrom<&Value> for IntType {
 
     fn try_from(value: &Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Int(this) => Ok(this.clone()),
+            Value::Int(this) => Ok(*this),
             _ => Err(RuntimeError {
                 msg: format!("Expected int, got a {}", value),
             }),
@@ -199,6 +207,25 @@ impl From<List> for Value {
     }
 }
 
+impl<'a> TryFrom<&'a Value> for &'a Vector<Value> {
+    type Error = RuntimeError;
+
+    fn try_from(value: &'a Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Vector(this) => Ok(this),
+            _ => Err(RuntimeError {
+                msg: format!("Expected vector, got a {}", value),
+            }),
+        }
+    }
+}
+
+impl From<Vector<Value>> for Value {
+    fn from(i: Vector<Value>) -> Self {
+        Value::Vector(i)
+    }
+}
+
 impl<'a> TryFrom<&'a Value> for &'a Lambda {
     type Error = RuntimeError;
 
@@ -267,19 +294,25 @@ impl std::fmt::Display for Value {
         match self {
             Value::NativeFunc(_) => f.write_str("<native_function>"),
             Value::NativeClosure(_) => f.write_str("<closure_function>"),
-            Value::True => f.write_str("T"),
-            Value::False => f.write_str("F"),
+            Value::True => f.write_str("#t"),
+            Value::False => f.write_str("#f"),
             Value::Lambda(this) => write!(f, "<func:(lambda {})>", this),
             Value::Macro(this) => write!(f, "(macro {})", this),
             Value::String(this) => write!(f, "\"{}\"", this),
             Value::List(this) => write!(f, "{}", this),
+            Value::Vector(vector) => {
+                write!(f, "[")?;
+                for v in vector {
+                    write!(f, "{},", v)?;
+                }
+                write!(f, "]")
+            }
             Value::HashMap(this) => {
                 let borrowed = this.borrow();
                 let entries = std::iter::once(lisp! { hash }).chain(
                     borrowed
                         .iter()
-                        .map(|(key, value)| [key.clone(), value.clone()].into_iter())
-                        .flatten(),
+                        .flat_map(|(key, value)| [key.clone(), value.clone()].into_iter()),
                 );
 
                 let list = Value::List(entries.collect());
@@ -288,11 +321,12 @@ impl std::fmt::Display for Value {
             }
             Value::Int(this) => write!(f, "{}", this),
             Value::Float(this) => write!(f, "{}", this),
-            Value::Symbol(Symbol(this)) => write!(f, "{}", this),
+            Value::Symbol(this) => write!(f, "{}", this),
             Value::Foreign(_) => f.write_str("<foreign_value>"),
             Value::TailCall { func, args } => {
                 write!(f, "<tail-call: {:?} with {:?} >", func, args)
             }
+            Value::Bytecode(code) => write!(f, "{:?}", code),
         }
     }
 }
@@ -308,16 +342,18 @@ impl Debug for Value {
             Value::Macro(this) => write!(f, "Value::Macro({:?})", this),
             Value::String(this) => write!(f, "Value::String({:?})", this),
             Value::List(this) => write!(f, "Value::List({:?})", this),
+            Value::Vector(this) => write!(f, "Value::Vector({:?})", this),
             Value::HashMap(this) => write!(f, "Value::HashMap({:?})", this),
             Value::Int(this) => write!(f, "Value::Int({:?})", this),
             Value::Float(this) => write!(f, "Value::Float({:?})", this),
-            Value::Symbol(Symbol(this)) => write!(f, "Value::Symbol({:?})", this),
+            Value::Symbol(this) => write!(f, "Value::Symbol({:?})", this),
             Value::Foreign(_) => f.write_str("<foreign_value>"),
             Value::TailCall { func, args } => write!(
                 f,
                 "Value::TailCall {{ func: {:?}, args: {:?} }}",
                 func, args
             ),
+            Value::Bytecode(code) => write!(f, "{:?}", code),
         }
     }
 }
@@ -331,6 +367,7 @@ impl PartialEq for Value {
             (Value::Macro(this), Value::Macro(other)) => this == other,
             (Value::String(this), Value::String(other)) => this == other,
             (Value::List(this), Value::List(other)) => this == other,
+            (Value::Vector(this), Value::Vector(other)) => this == other,
             (Value::Int(this), Value::Int(other)) => this == other,
             (Value::Float(this), Value::Float(other)) => this.to_bits() == other.to_bits(),
             (Value::Symbol(this), Value::Symbol(other)) => this == other,
@@ -346,7 +383,7 @@ impl PartialEq for Value {
                     args: other_args,
                 },
             ) => this_func == other_func && this_args == other_args,
-
+            (Value::Bytecode(a), Value::Bytecode(b)) => a == b,
             _ => false,
         }
     }
@@ -364,7 +401,7 @@ impl PartialOrd for Value {
             (Value::True, Value::False) => Some(Ordering::Less),
             (Value::False, Value::True) => Some(Ordering::Greater),
             (Value::String(this), Value::String(other)) => this.partial_cmp(other),
-            (Value::Symbol(Symbol(this)), Value::Symbol(Symbol(other))) => this.partial_cmp(other),
+            (Value::Symbol(this), Value::Symbol(other)) => this.partial_cmp(other),
             (Value::Int(this), Value::Int(other)) => this.partial_cmp(other),
             (Value::Float(this), Value::Float(other)) => this.partial_cmp(other),
             (Value::Int(this), Value::Float(other)) => {
@@ -390,10 +427,10 @@ impl Add<&Value> for &Value {
 
             // different numeric types
             (Value::Int(this), Value::Float(other)) => {
-                Ok(Value::from(int_type_to_float_type(&this) + other))
+                Ok(Value::from(int_type_to_float_type(this) + other))
             }
             (Value::Float(this), Value::Int(other)) => {
-                Ok(Value::from(this + int_type_to_float_type(&other)))
+                Ok(Value::from(this + int_type_to_float_type(other)))
             }
 
             // non-string + string
@@ -428,10 +465,10 @@ impl Sub<&Value> for &Value {
             (Value::Float(this), Value::Float(other)) => Ok(Value::from(this - other)),
 
             (Value::Int(this), Value::Float(other)) => {
-                Ok(Value::from(int_type_to_float_type(&this) - other))
+                Ok(Value::from(int_type_to_float_type(this) - other))
             }
             (Value::Float(this), Value::Int(other)) => {
-                Ok(Value::from(this - int_type_to_float_type(&other)))
+                Ok(Value::from(this - int_type_to_float_type(other)))
             }
 
             _ => Err(()),
@@ -456,10 +493,10 @@ impl Mul<&Value> for &Value {
             (Value::Float(this), Value::Float(other)) => Ok(Value::from(this * other)),
 
             (Value::Int(this), Value::Float(other)) => {
-                Ok(Value::from(int_type_to_float_type(&this) * other))
+                Ok(Value::from(int_type_to_float_type(this) * other))
             }
             (Value::Float(this), Value::Int(other)) => {
-                Ok(Value::from(this * int_type_to_float_type(&other)))
+                Ok(Value::from(this * int_type_to_float_type(other)))
             }
 
             _ => Err(()),
@@ -484,10 +521,10 @@ impl Div<&Value> for &Value {
             (Value::Float(this), Value::Float(other)) => Ok(Value::from(this / other)),
 
             (Value::Int(this), Value::Float(other)) => {
-                Ok(Value::from(int_type_to_float_type(&this) / other))
+                Ok(Value::from(int_type_to_float_type(this) / other))
             }
             (Value::Float(this), Value::Int(other)) => {
-                Ok(Value::from(this / int_type_to_float_type(&other)))
+                Ok(Value::from(this / int_type_to_float_type(other)))
             }
 
             _ => Err(()),
@@ -509,13 +546,13 @@ fn int_type_to_float_type(i: &IntType) -> FloatType {
         if #[cfg(feature = "bigint")] {
             cfg_if! {
                 if #[cfg(feature = "f64")] {
-                    return i.to_f64().unwrap_or(f64::NAN);
+                    i.to_f64().unwrap_or(f64::NAN)
                 } else {
-                    return i.to_f32().unwrap_or(f32::NAN);
+                    i.to_f32().unwrap_or(f32::NAN)
                 }
             }
         } else {
-            return *i as FloatType;
+            *i as FloatType
         }
     }
 }
@@ -540,6 +577,7 @@ impl std::hash::Hash for Value {
             Value::String(x) => x.hash(state),
             Value::Symbol(x) => x.hash(state),
             Value::List(x) => x.hash(state),
+            Value::Vector(x) => x.hash(state),
             Value::HashMap(x) => x.as_ptr().hash(state),
             Value::NativeFunc(x) => std::ptr::hash(x, state),
             Value::NativeClosure(x) => std::ptr::hash(x, state),
@@ -550,6 +588,7 @@ impl std::hash::Hash for Value {
                 func.hash(state);
                 args.hash(state);
             }
+            Value::Bytecode(_) => unreachable!(),
         }
     }
 }

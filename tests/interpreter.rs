@@ -1,9 +1,10 @@
 use rust_lisp::{
+    compiler::{compile, Opcode},
     default_env,
-    interpreter::eval,
+    eval::op_eval,
     lisp,
-    model::{FloatType, IntType, RuntimeError, Symbol, Value},
     parser::parse,
+    CompileError, Env, FloatType, IntType, RuntimeError, Symbol, Value,
 };
 use std::{cell::RefCell, rc::Rc};
 
@@ -37,7 +38,7 @@ fn eval_mul_list_mixed() {
 
 #[test]
 fn eval_nil() {
-    let result = eval_str("(== nil '())");
+    let result = eval_str("(= nil '())");
 
     assert_eq!(result, Value::from(true));
 }
@@ -74,20 +75,20 @@ fn eval_quote_tick_atom() {
 fn eval_quote_tick_symbol() {
     let result = eval_str("(nth 0 (list 'foo))");
 
-    assert_eq!(result, Value::Symbol(Symbol(String::from("foo"))));
+    assert_eq!(result, Value::Symbol(Symbol::from_ref("foo")));
 }
 
 #[test]
 fn eval_let() {
     let result = eval_str(
         "
-    (let ((foo 12)
-          (bar (+ 4 3))
-          (blah \"stuff\"))
-      (print foo)
-      (print bar)
-      (print blah)
-      (list (* foo bar) (+ blah \" also\")))",
+        (let ((foo 12)
+              (bar (+ 4 3))
+              (blah \"stuff\"))
+          (print foo)
+          (print bar)
+          (print blah)
+          (list (* foo bar) (+ blah \" also\")))",
     );
 
     assert_eq!(result, lisp! { (84 "stuff also") });
@@ -96,18 +97,19 @@ fn eval_let() {
 #[test]
 #[should_panic]
 fn eval_let_scope() {
-    let result = eval_str(
+    let result = eval_str_without_default_env(
         "
-    (begin
-      (let ((foo 12)
-            (bar (+ 4 3))
-            (blah \"stuff\"))
-        (print foo)
-        (print bar)
-        (print blah))
-
-      (* foo bar))",
-    );
+        (begin
+          (let ((foo 12)
+                (bar (+ 4 3))
+                (blah \"stuff\"))
+            (print foo)
+            (print bar)
+            (print blah))
+    
+          (* foo bar))",
+    )
+    .unwrap();
 
     assert_eq!(result, lisp! { (84 "stuff also") });
 }
@@ -116,13 +118,13 @@ fn eval_let_scope() {
 fn eval_set_global() {
     let result = eval_str(
         "
-    (begin
-      (define foo 12)
-
-      (let ((bar 25))
-        (set foo 13))
-
-      foo)",
+        (begin
+          (define foo 12)
+    
+          (let ((bar 25))
+            (set! foo 13))
+    
+          foo)",
     );
 
     assert_eq!(result, Value::from(Into::<IntType>::into(13)));
@@ -132,13 +134,13 @@ fn eval_set_global() {
 fn eval_set_local() {
     let result = eval_str(
         "
-    (begin
-      (define foo 12)
-
-      (let ((bar 25))
-        (set bar 13))
-
-      foo)",
+        (begin
+          (define foo 12)
+    
+          (let ((bar 25))
+            (set! bar 13))
+    
+          foo)",
     );
 
     assert_eq!(result, Value::from(Into::<IntType>::into(12)));
@@ -149,9 +151,9 @@ fn eval_set_local() {
 fn eval_set_undefined() {
     eval_str(
         "
-    (begin
-      (let ((bar 25))
-        (set foo 13)))",
+        (begin
+          (let ((bar 25))
+            (set! foo 13)))",
     );
 }
 
@@ -159,15 +161,15 @@ fn eval_set_undefined() {
 fn eval_fib() {
     let result = eval_str(
         "
-    (begin
-      (define fib 
-        (lambda (n)
-          (cond           ;; some comment
-            ((== n 0) 0)
-            ((== n 1) 1)
-            (T (+ (fib (- n 1)) (fib (- n 2)) ))))) ;;another comment
-
-      (list (fib 0) (fib 1) (fib 2) (fib 3) (fib 4) (fib 5) (fib 6) (fib 7) (fib 8)))",
+        (begin
+          (define fib 
+            (lambda (n)
+              (cond           ;; some comment
+                ((= n 0) 0)
+                ((= n 1) 1)
+                (#t (+ (fib (- n 1)) (fib (- n 2)) ))))) ;;another comment
+    
+          (list (fib 0) (fib 1) (fib 2) (fib 3) (fib 4) (fib 5) (fib 6) (fib 7) (fib 8)))",
     );
 
     assert_eq!(result, lisp! { (0 1 1 2 3 5 8 13 21) });
@@ -177,31 +179,31 @@ fn eval_fib() {
 fn eval_merge_sort() {
     let result = eval_str(
         "
-    (begin
-
-      (defun list-head (lst n) 
-        (if (== n 0) 
-          (list) 
-          (cons (car lst) (list-head (cdr lst) (- n 1)))))
-
-      (defun list-tail (lst n) 
-        (if (== n 0) 
-          lst 
-          (list-tail (cdr lst) (- n 1))))
-
-      (defun merge (lst-a lst-b)
-        (cond ((not lst-a) lst-b)
-              ((not lst-b) lst-a)
-              ((< (car lst-a) (car lst-b)) (cons (car lst-a) (merge (cdr lst-a) lst-b)))
-              (T (cons (car lst-b) (merge lst-a (cdr lst-b))))))
-
-      (defun mergesort (lst)
-        (if (== (length lst) 1)
-          lst
-          (merge (mergesort (list-head lst (truncate (length lst) 2)))
-                (mergesort (list-tail lst (truncate (length lst) 2))))))
-
-      (mergesort (list 7 2 5 0 1 5)))",
+        (begin
+    
+          (defun list-head (lst n) 
+            (if (= n 0) 
+              (list) 
+              (cons (car lst) (list-head (cdr lst) (- n 1)))))
+    
+          (defun list-tail (lst n) 
+            (if (= n 0) 
+              lst 
+              (list-tail (cdr lst) (- n 1))))
+    
+          (defun merge (lst-a lst-b)
+            (cond ((not lst-a) lst-b)
+                  ((not lst-b) lst-a)
+                  ((< (car lst-a) (car lst-b)) (cons (car lst-a) (merge (cdr lst-a) lst-b)))
+                  (#t (cons (car lst-b) (merge lst-a (cdr lst-b))))))
+    
+          (defun mergesort (lst)
+            (if (= (length lst) 1)
+              lst
+              (merge (mergesort (list-head lst (truncate (length lst) 2)))
+                    (mergesort (list-tail lst (truncate (length lst) 2))))))
+    
+          (mergesort (list 7 2 5 0 1 5)))",
     );
 
     assert_eq!(result, lisp! { (0 1 2 5 5 7) });
@@ -211,16 +213,16 @@ fn eval_merge_sort() {
 fn tail_call_test() {
     let result = eval_str(
         "
-    (begin
-      (defun recurse-test (n)
-          (if (> n 0) 
-            (begin
-              (print n)
-              (recurse-test (- n 1)))
-            n))
-      
-      (recurse-test 1000))
-  ",
+        (begin
+          (defun recurse-test (n)
+              (if (> n 0) 
+                (begin
+                  (print n)
+                  (recurse-test (- n 1)))
+                n))
+          
+          (recurse-test 1000))
+      ",
     );
 
     assert_eq!(result, Value::from(Into::<IntType>::into(0)));
@@ -230,11 +232,11 @@ fn tail_call_test() {
 fn rest_parameters_test() {
     let result = eval_str(
         "
-    (begin
-      (defun foo (a b ...)
-        ...)
-      
-      (foo 1 2 3 4 5))",
+        (begin
+          (defun foo (a b ...)
+            ...)
+          
+          (foo 1 2 3 4 5))",
     );
 
     assert_eq!(result, lisp! { (3 4 5) });
@@ -244,10 +246,10 @@ fn rest_parameters_test() {
 fn calling_empty_fun() {
     let result = eval_str(
         "
-    (begin
-      (defun foo () ())
-      
-      (foo))",
+        (begin
+          (defun foo () ())
+          
+          (foo))",
     );
 
     assert_eq!(result, lisp! { () });
@@ -257,8 +259,8 @@ fn calling_empty_fun() {
 fn closure() {
     let result = eval_str(
         "
-    (map (let ((x 3)) (lambda (y) (+ x y))) (list 0 1 2 3 4))
-        ",
+        (map (let ((x 3)) (lambda (y) (+ x y))) (list 0 1 2 3 4))
+            ",
     );
 
     assert_eq!(result, lisp! {(3 4 5 6 7)});
@@ -268,18 +270,17 @@ fn closure() {
 fn lambda_err() {
     let ast = parse(
         "
-      (defun foo (f) f)",
+          (defun foo (#f) #f)",
     )
     .next()
     .unwrap()
     .unwrap();
-    let env = Rc::new(RefCell::new(default_env()));
-    let result = eval(env, &ast);
+    let code = compile(ast);
 
     assert_eq!(
-        result,
-        Err(RuntimeError {
-            msg: String::from("Expected list of arg names, but arg 0 is a F")
+        code,
+        Err(CompileError {
+            msg: String::from("Expected list of arg names, but arg 0 is a #f")
         })
     );
 }
@@ -288,8 +289,8 @@ fn lambda_err() {
 fn quote_comma() {
     let result = eval_str(
         "
-    '(+ 1 2 3 ,(+ 2 2))
-    ",
+        `(+ 1 2 3 ,(+ 2 2))
+        ",
     );
 
     assert_eq!(result, lisp! { (+ 1 2 3 4) })
@@ -299,12 +300,12 @@ fn quote_comma() {
 fn defmacro() {
     let result = eval_str(
         "
-    (begin
-      (defmacro foo (x)
-        '(list ,x ,x ,x))
-      
-      (foo 3))
-  ",
+        (begin
+          (defmacro foo (x)
+            `(list ,x ,x ,x))
+          
+          (foo 3))
+      ",
     );
 
     assert_eq!(result, lisp! { (3 3 3) })
@@ -314,50 +315,124 @@ fn defmacro() {
 fn or_expressions() {
     let result = eval_str(
         "
-    '(
-      ,(or)
-      ,(or T)
-      ,(or F T)
-      ,(or F F T)
-
-      ,(or F)
-      ,(or F F)
-      ,(or F F F))",
+        `(
+          ,(or)
+          ,(or #t)
+          ,(or #f #t)
+          ,(or #f #f #t)
+    
+          ,(or #f)
+          ,(or #f #f)
+          ,(or #f #f #f))",
     );
 
-    assert_eq!(result, lisp! { (F T T T F F F) })
+    assert_eq!(result, eval_str("'(#f #t #t #t #f #f #f)"))
 }
 
 #[test]
 fn and_expressions() {
     let result = eval_str(
         "
-    '(
-      ,(and)
-      ,(and F)
-      ,(and T F)
-      ,(and T T F)
-
-      ,(and T)
-      ,(and T T)
-      ,(and T T T))",
+        `(
+          ,(and)
+          ,(and #f)
+          ,(and #t #f)
+          ,(and #t #t #f)
+    
+          ,(and #t)
+          ,(and #t #t)
+          ,(and #t #t #t))",
     );
 
-    assert_eq!(result, lisp! { (T F F F T T T) })
+    assert_eq!(result, lisp! { (T F F F T T T) });
+}
+
+#[test]
+fn test_compile_and_list() {
+    let s = "(list (and) (and #f) (and #t #f))";
+
+    let ast = parse(s).next().unwrap().unwrap();
+
+    println!("AST: {}", ast);
+
+    assert_eq!(
+        compile(ast).unwrap(),
+        vec![
+            Opcode::LoadName(Symbol::from_ref("list")),
+            Opcode::LoadConst(Value::True),
+            Opcode::LoadConst(Value::False),
+            Opcode::LoadConst(Value::True),
+            Opcode::RelativeJumpIfFalsePreserve { offset: 1 },
+            Opcode::LoadConst(Value::False),
+            Opcode::CallFunction { arg_count: 3 }
+        ]
+    )
+}
+
+#[test]
+fn test_compile_and_comma() {
+    //let s = "(and T F)";
+    let s = "
+        `(
+          ,(and)
+          ,(and #f)
+          ,(and #t #f)
+        )";
+
+    let ast = parse(s).next().unwrap().unwrap();
+
+    println!("AST: {}", ast);
+
+    assert_eq!(
+        compile(ast).unwrap(),
+        vec![
+            Opcode::LoadConst(Value::True),
+            Opcode::LoadConst(Value::False),
+            Opcode::LoadConst(Value::True),
+            Opcode::RelativeJumpIfFalsePreserve { offset: 1 },
+            Opcode::LoadConst(Value::False),
+            Opcode::MakeList { element_count: 3 }
+        ]
+    )
+}
+
+#[test]
+fn and_expressions3() {
+    let result = eval_str("(list (and) (and #f) (and #t #f))");
+
+    //assert_eq!(result, eval_str("(list (and) (and F) (and T F))"));
+
+    assert_eq!(result, eval_str("'(#t #f #f)"))
+}
+
+#[test]
+fn and_expressions2() {
+    let result = eval_str(
+        "
+        `(
+          ,(and)
+          ,(and #f)
+          ,(and #t #f)
+        )",
+    );
+
+    //assert_eq!(result, eval_str("(list (and) (and F) (and T F))"));
+
+    assert_eq!(result, eval_str("'(#t #f #f)"))
 }
 
 #[test]
 fn short_circuit() {
     let result = eval_str(
         "
-    (begin
-      (define foo 0)
-
-      (or
-        T
-        (set foo 12))
-
-      foo)",
+        (begin
+          (define foo 0)
+    
+          (or
+            #t
+            (set! foo 12))
+    
+          foo)",
     );
 
     assert_eq!(result, lisp! { 0 })
@@ -377,7 +452,7 @@ fn native_closure() {
     let mut env = default_env();
     let my_state_closure = my_state.clone();
     env.define(
-        Symbol::from("my_closure"),
+        Symbol::from_ref("my_closure"),
         Value::NativeClosure(Rc::new(RefCell::new(
             move |_env, _args| -> Result<Value, RuntimeError> {
                 let current = *my_state_closure.borrow();
@@ -388,69 +463,27 @@ fn native_closure() {
     );
     let env = Rc::new(RefCell::new(env));
 
-    eval(env, &expression).unwrap();
+    let code = compile(expression).unwrap();
+    op_eval(&code, env).unwrap();
 
     assert_eq!(*my_state.borrow(), 3);
 }
 
 #[cfg(test)]
-fn eval_str(source: &str) -> Value {
+fn eval_str_with_error(source: &str) -> Result<Value, RuntimeError> {
     let ast = parse(source).next().unwrap().unwrap();
     let env = Rc::new(RefCell::new(default_env()));
-    return eval(env, &ast).unwrap();
+    op_eval(&compile(ast).unwrap(), env)
 }
 
-// #[bench]
-// #[test]
-// fn bench_merge_sort() {
+#[cfg(test)]
+fn eval_str(source: &str) -> Value {
+    eval_str_with_error(source).unwrap()
+}
 
-//   // let mut v = vec![];
-//   // loop {
-//   //   v.push("Stuff");
-//   // }
-
-//   let source = "
-//     (begin
-//       (define
-//         list-head
-//         (lambda (lst n)
-//           (if (== n 0)
-//             (list)
-//             (cons (car lst) (list-head (cdr lst) (- n 1))))))
-
-//       (define
-//         list-tail
-//         (lambda (lst n)
-//           (if (== n 0)
-//             lst
-//             (list-tail (cdr lst) (- n 1)))))
-
-//       (define
-//         merge
-//         (lambda (lst-a lst-b)
-//           (cond ((not lst-a) lst-b)
-//                 ((not lst-b) lst-a)
-//                 ((< (car lst-a) (car lst-b)) (cons (car lst-a) (merge (cdr lst-a) lst-b)))
-//                 (T (cons (car lst-b) (merge lst-a (cdr lst-b)))))))
-
-//       (define
-//         mergesort
-//         (lambda (lst)
-//           (if (== (length lst) 1)
-//             lst
-//             (merge (mergesort (list-head lst (truncate (length lst) 2)))
-//                   (mergesort (list-tail lst (truncate (length lst) 2)))))))
-
-//       (mergesort (list 75 10 45 26 34 36 10 97 34 64 24 20 24 30 39 39 1 53 20 57 6 24 37 41 51 49 12 78 11 71 16 12 60 42 76 63 64 84 11 31 8 48 41 62 98 2 31 53 37 57 14 85 74 75 98 65 69 37 60 96 33 5 95 21 85 7 31 37 2 78 51 88 70 36 1 18 41 68 1 6 16 61 32 80 63 60 92 61 89 91 33 34 61 21 32 14 64 63 8 91)))";
-//   let ast = parse(source).unwrap();
-
-//   let env = Rc::new(RefCell::new(default_env()));
-
-//   let start = SystemTime::now();
-//   // for _ in 0..10000 {
-//     eval(env.clone(), &ast);
-//   // }
-//   let end = SystemTime::now();
-
-//   println!("Took {}ms", end.duration_since(start).unwrap().as_millis());
-// }
+#[cfg(test)]
+fn eval_str_without_default_env(source: &str) -> Result<Value, RuntimeError> {
+    let ast = parse(source).next().unwrap().unwrap();
+    let env = Rc::new(RefCell::new(Env::new()));
+    op_eval(&compile(ast).unwrap(), env)
+}

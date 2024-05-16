@@ -33,36 +33,38 @@ macro_rules! lisp {
 
     // Lists
     ( ( $($val:tt)* ) ) => {
-        $crate::model::Value::List([ $(lisp!{ $val }),* ].iter().collect::<$crate::model::List>())
+        $crate::Value::List([ $(lisp!{ $val }),* ].iter().collect::<$crate::List>())
     };
 
 
     // 🦀 Very special!
     // Special atoms
-    (nil) => { $crate::model::Value::NIL   };
-    (NIL) => { $crate::model::Value::NIL   };
-    (t) =>   { $crate::model::Value::True  };
-    (T) =>   { $crate::model::Value::True  };
-    (f) =>   { $crate::model::Value::False };
-    (F) =>   { $crate::model::Value::False };
+    (nil) => { $crate::Value::NIL   };
+    (NIL) => { $crate::Value::NIL   };
+    (#t) =>   { $crate::Value::True  };
+    (#f) =>   { $crate::Value::False };
 
+    // Convenience not in actual lang
+    ( set ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("set!"))) };
+    ( == ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("="))) };
+    (T) =>   { $crate::Value::True  };
+    (F) =>   { $crate::Value::False };
 
     // Symbols
     ($sym:ident) => {
-        $crate::model::Value::Symbol($crate::model::Symbol(String::from(stringify!( $sym ))))
+        $crate::Value::Symbol($crate::Symbol::new(String::from(stringify!( $sym ))))
     };
     // these aren't valid Rust identifiers
-    ( + ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from("+"))) };
-    ( - ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from("-"))) };
-    ( * ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from("*"))) };
-    ( / ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from("/"))) };
-    ( == ) => { $crate::model::Value::Symbol($crate::model::Symbol(String::from("=="))) };
-    ( != ) => { $crate::model::Value::Symbol($crate::model::Symbol(String::from("!="))) };
-    ( < ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from("<"))) };
-    ( <= ) => { $crate::model::Value::Symbol($crate::model::Symbol(String::from("<="))) };
-    ( > ) =>  { $crate::model::Value::Symbol($crate::model::Symbol(String::from(">"))) };
-    ( >= ) => { $crate::model::Value::Symbol($crate::model::Symbol(String::from(">="))) };
-
+    ( + ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("+"))) };
+    ( - ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("-"))) };
+    ( * ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("*"))) };
+    ( / ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("/"))) };
+    ( = ) => { $crate::Value::Symbol($crate::Symbol::new(String::from("="))) };
+    ( != ) => { $crate::Value::Symbol($crate::Symbol::new(String::from("!="))) };
+    ( < ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from("<"))) };
+    ( <= ) => { $crate::Value::Symbol($crate::Symbol::new(String::from("<="))) };
+    ( > ) =>  { $crate::Value::Symbol($crate::Symbol::new(String::from(">"))) };
+    ( >= ) => { $crate::Value::Symbol($crate::Symbol::new(String::from(">="))) };
 
     // Literals
     ($e:literal) => {

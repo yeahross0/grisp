@@ -14,10 +14,6 @@ path = "src/lib.rs"
 test = true
 doc = true
 
-[[bin]]
-name = "rust_lisp"
-path = "src/main.rs"
-
 [features]
 # What integer to use for Value::Int
 bigint = ["num-bigint", "num-traits"]
@@ -34,3 +30,6 @@ cfg-if = "1.0"
 libm = { version = "0.2", optional = true }
 num-traits = { version = "0.2", optional = true }
 num-bigint = { version = "0.4", optional = true }
+im = { package = "im-rc", version = "15.1" }
+internment = "0.8.3"
+halfbrown = "0.2.5"

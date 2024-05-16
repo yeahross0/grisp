@@ -1,11 +1,10 @@
 use std::cell::RefCell;
-use std::fmt::Debug;
 use std::rc::Rc;
 
 use super::{Env, Symbol, Value};
 
 /// A Lisp function defined in Lisp.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Lambda {
     pub closure: Rc<RefCell<Env>>,
     pub argnames: Vec<Symbol>,
@@ -32,15 +31,32 @@ impl std::fmt::Display for Lambda {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let body_str = format!("{}", &self.body);
 
-        return write!(
+        write!(
             f,
             "({}) {}",
             self.argnames
                 .iter()
-                .map(|sym| sym.0.as_str())
+                .map(|sym| sym.as_str())
                 .collect::<Vec<&str>>()
                 .join(" "),
             &body_str[1..body_str.chars().count() - 1]
-        );
+        )
+    }
+}
+
+impl std::fmt::Debug for Lambda {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let body_str = format!("{}", &self.body);
+
+        write!(
+            f,
+            "BIG LAMBDA ({}) {}",
+            self.argnames
+                .iter()
+                .map(|sym| sym.as_str())
+                .collect::<Vec<&str>>()
+                .join(" "),
+            &body_str[1..body_str.chars().count() - 1]
+        )
     }
 }

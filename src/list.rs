@@ -55,7 +55,7 @@ impl<'a> List {
 /// A `ConsCell` is effectively a linked-list node, where the value in each node
 /// is a lisp `Value`. To be used as a true "list", the ConsCell must be wrapped
 /// in Value::List().
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 struct ConsCell {
     pub car: Value,
     pub cdr: Option<Rc<RefCell<ConsCell>>>,
@@ -80,9 +80,45 @@ impl Display for List {
 
 impl Display for ConsCell {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.cdr.as_ref() {
-            Some(cdr) => write!(formatter, "{} {}", self.car, cdr.borrow()),
-            None => write!(formatter, "{}", self.car),
+        write!(formatter, "{} ", self.car)?;
+        //let mut cell = self.cdr.borrow();
+        let mut it = ConsIterator(self.cdr.clone()).peekable();
+        while let Some(thing) = it.next() {
+            if it.peek().is_some() {
+                write!(formatter, "{} ", thing)?;
+            } else {
+                write!(formatter, "{}", thing)?;
+            }
+        }
+        write!(formatter, "")
+    }
+}
+
+impl Debug for ConsCell {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{:?} ", self.car)?;
+        let mut it = ConsIterator(self.cdr.clone()).peekable();
+        while let Some(thing) = it.next() {
+            if it.peek().is_some() {
+                write!(formatter, "{:?} ", thing)?;
+            } else {
+                write!(formatter, "{:?}", thing)?;
+            }
+        }
+        write!(formatter, "")
+    }
+}
+
+impl Drop for ConsCell {
+    fn drop(&mut self) {
+        let mut next = self.cdr.take();
+
+        while let Some(rc) = next {
+            if let Ok(cell) = Rc::try_unwrap(rc) {
+                next = cell.borrow_mut().cdr.take();
+            } else {
+                break;
+            }
         }
     }
 }
