@@ -1,9 +1,9 @@
 [package]
-name = "rust_lisp"
-description = "A Rust-embeddable Lisp, with support for interop with native Rust functions"
+name = "grisp"
+description = "Personal lisp"
 version = "0.18.0"
-authors = ["Brandon Smith"]
-repository = "https://github.com/brundonsmith/rust_lisp"
+authors = ["Brandon Smith", "yeahross"]
+repository = "https://github.com/yeahross0/grisp"
 edition = "2021"
 exclude = [".github", ".vscode", "TODO.txt"]
 license = "MIT"
