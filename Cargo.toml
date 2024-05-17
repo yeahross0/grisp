@@ -9,7 +9,7 @@ exclude = [".github", ".vscode", "TODO.txt"]
 license = "MIT"
 
 [lib]
-name = "rust_lisp"
+name = "grisp"
 path = "src/lib.rs"
 test = true
 doc = true
