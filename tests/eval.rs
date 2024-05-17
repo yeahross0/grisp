@@ -1,4 +1,3 @@
-use im::vector;
 use grisp::eval::op_eval;
 use grisp::parser::parse;
 use grisp::RuntimeError;
@@ -6,6 +5,7 @@ use grisp::{compiler::*, Env};
 use grisp::{
     default_env, lisp, {Symbol, Value},
 };
+use im::vector;
 use std::{cell::RefCell, rc::Rc};
 
 fn express(source: &str) -> Value {
@@ -563,6 +563,18 @@ fn test_eval_or() {
                 (or #f #f)
             "
             ))
+            .unwrap(),
+            env.clone()
+        )
+        .unwrap(),
+        Value::False
+    );
+
+    assert_eq!(
+        op_eval(
+            &compile(lisp! {
+                (or F)
+            },)
             .unwrap(),
             env.clone()
         )
