@@ -1,4 +1,4 @@
-use rust_lisp::{
+use grisp::{
     default_env, lisp,
     {compiler::compile, eval::op_eval},
     {IntType, Value},

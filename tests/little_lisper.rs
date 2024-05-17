@@ -1,5 +1,5 @@
-use rust_lisp::{compiler::compile, eval::op_eval};
-use rust_lisp::{default_env, lisp, parser::parse, IntType, RuntimeError, Value};
+use grisp::{compiler::compile, eval::op_eval};
+use grisp::{default_env, lisp, parser::parse, IntType, RuntimeError, Value};
 use std::{cell::RefCell, rc::Rc};
 
 #[test]

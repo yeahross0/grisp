@@ -1,4 +1,4 @@
-use rust_lisp::{
+use grisp::{
     compiler::{compile, Opcode},
     default_env,
     eval::op_eval,

@@ -42,6 +42,7 @@ pub fn op_eval_inner(
             break;
         }
         let ins = &code[pc];
+        //println!("INS: {:?}", ins);
         pc += 1;
 
         match ins {

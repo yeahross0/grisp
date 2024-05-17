@@ -1,10 +1,10 @@
-use rust_lisp::{
-    {IntType, Value},
+use grisp::{
     parser::{parse, ParseError},
+    {IntType, Value},
 };
 
 #[macro_use]
-extern crate rust_lisp;
+extern crate grisp;
 
 #[test]
 fn parse_basic_expression() {

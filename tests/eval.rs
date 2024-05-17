@@ -1,9 +1,9 @@
 use im::vector;
-use rust_lisp::eval::op_eval;
-use rust_lisp::parser::parse;
-use rust_lisp::RuntimeError;
-use rust_lisp::{compiler::*, Env};
-use rust_lisp::{
+use grisp::eval::op_eval;
+use grisp::parser::parse;
+use grisp::RuntimeError;
+use grisp::{compiler::*, Env};
+use grisp::{
     default_env, lisp, {Symbol, Value},
 };
 use std::{cell::RefCell, rc::Rc};

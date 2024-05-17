@@ -1,6 +1,6 @@
-use rust_lisp::compiler::*;
-use rust_lisp::parser::parse;
-use rust_lisp::{
+use grisp::compiler::*;
+use grisp::parser::parse;
+use grisp::{
     lisp, {Symbol, Value},
 };
 use std::rc::Rc;

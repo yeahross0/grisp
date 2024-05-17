@@ -33,9 +33,9 @@ rust_lisp = "0.18.0"
 ```rust
 use std::{cell::RefCell, rc::Rc};
 
-use rust_lisp::default_env;
-use rust_lisp::parser::parse;
-use rust_lisp::interpreter::eval;
+use grisp::default_env;
+use grisp::parser::parse;
+use grisp::interpreter::eval;
 
 fn main() {
 
