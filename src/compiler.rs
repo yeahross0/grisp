@@ -609,7 +609,8 @@ pub fn compile_inner(
                 }
             }
         }
-        _ => unimplemented!("{:?}", expression),
+        //_ => unimplemented!("{:?}", expression),
+        _ => vec![Opcode::LoadConst(expression)],
     };
 
     Ok(res)

@@ -91,7 +91,14 @@ pub fn op_eval_inner(
                                 );
                                 break;
                             } else {
-                                body_env.define(*arg_name, args[index].clone());
+                                body_env.define(
+                                    *arg_name,
+                                    args.get(index)
+                                        .ok_or(RuntimeError {
+                                            msg: format!("No element {}", index),
+                                        })?
+                                        .clone(),
+                                );
                             }
                         }
                         if let Value::Bytecode(bc) = lambda.body.as_ref() {

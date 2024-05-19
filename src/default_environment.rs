@@ -765,5 +765,22 @@ pub fn default_env() -> Env {
         }),
     );
 
+    env.define(
+        Symbol::from_ref("sqrt"),
+        Value::NativeFunc(|_env, args| {
+            let val = require_arg("sqrt", &args, 0)?;
+
+            let result = match val {
+                Value::Int(v) => Value::Float((*v as f32).sqrt()),
+                Value::Float(v) => Value::Float(v.sqrt()),
+                _ => Err(RuntimeError {
+                    msg: format!("Sqrt expects number, got: {}", val),
+                })?,
+            };
+
+            Ok(result)
+        }),
+    );
+
     env
 }
