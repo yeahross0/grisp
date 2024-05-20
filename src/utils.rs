@@ -20,6 +20,27 @@ pub fn require_arg<'a>(
     })
 }
 
+pub fn require_float_arg<'a>(
+    func_or_form_name: &str,
+    args: &'a [Value],
+    index: usize,
+) -> Result<FloatType, RuntimeError> {
+    let value = require_arg(func_or_form_name, args, index)?;
+    match value {
+        Value::Float(this) => Ok(*this),
+        Value::Int(this) => Ok(*this as FloatType),
+        _ => Err(RuntimeError {
+            msg: format!(
+                "\"{}\" requires argument {} to be a {}; got {}",
+                func_or_form_name,
+                index + 1,
+                value.type_name(),
+                args.get(index).unwrap_or(&Value::NIL)
+            ),
+        }),
+    }
+}
+
 /// Given a `Value` assumed to be a `Value::List()`, and some type T, grab the
 /// item at `index` in the list and try converting it to type T. RuntimeError if
 /// the argument doesn't exist, or if it is the wrong type.

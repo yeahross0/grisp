@@ -82,7 +82,9 @@ fn parse_unclosed_string() {
     assert_eq!(
         res,
         Some(Err(ParseError {
-            msg: "Unclosed string at index 3".to_owned()
+            msg: "Unclosed string at index 3".to_owned(),
+            index: 0,
+            line: Some(1),
         }))
     )
 }
@@ -94,7 +96,9 @@ fn parse_unclosed_list() {
     assert_eq!(
         res,
         Some(Err(ParseError {
-            msg: "Unclosed list at index 7".to_owned()
+            msg: "Unclosed list at index 7".to_owned(),
+            index: 1,
+            line: Some(1),
         }))
     )
 }
@@ -106,7 +110,9 @@ fn parse_incomplete_float() {
     assert_eq!(
         res,
         Some(Err(ParseError {
-            msg: "Expected decimal value after '.' at index 1".to_owned()
+            msg: "Expected decimal value after '.' at index 1".to_owned(),
+            index: 1,
+            line: Some(1),
         }))
     )
 }

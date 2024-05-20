@@ -168,14 +168,28 @@ pub fn default_env() -> Env {
     env.define(
         Symbol::from_ref("nth"),
         Value::NativeFunc(|_env, args| {
-            let index = require_typed_arg::<IntType>("nth", &args, 0)?;
-            let list = require_typed_arg::<&List>("nth", &args, 1)?;
+            let list = require_typed_arg::<&List>("nth", &args, 0)?;
+            let index = require_typed_arg::<IntType>("nth", &args, 1)?;
 
             let index = TryInto::<usize>::try_into(index).map_err(|_| RuntimeError {
                 msg: "Failed converting to `usize`".to_owned(),
             })?;
 
             Ok(list.into_iter().nth(index).unwrap_or(Value::NIL))
+        }),
+    );
+
+    env.define(
+        Symbol::from_ref("vec:nth"),
+        Value::NativeFunc(|_env, args| {
+            let vector = require_typed_arg::<&Vector<Value>>("vec:nth", &args, 0)?;
+            let index = require_typed_arg::<IntType>("vec:nth", &args, 1)?;
+
+            let index = TryInto::<usize>::try_into(index).map_err(|_| RuntimeError {
+                msg: "Failed converting to `usize`".to_owned(),
+            })?;
+
+            Ok(vector.get(index).cloned().unwrap_or(Value::NIL))
         }),
     );
 

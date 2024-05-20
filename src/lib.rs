@@ -8,6 +8,8 @@ pub mod utils;
 mod default_environment;
 pub use default_environment::default_env;
 
+pub use im::Vector;
+
 #[macro_use]
 mod macros;
 

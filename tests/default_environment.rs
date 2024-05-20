@@ -21,7 +21,7 @@ fn range() {
 fn nth() {
     assert_eq!(
         eval_ast(lisp! {
-            (nth 3 (range 5 15))
+            (nth (range 5 15) 3)
         }),
         Value::from(Into::<IntType>::into(8))
     );

@@ -19,7 +19,21 @@ pub fn parse(code: &str) -> impl Iterator<Item = Result<Value, ParseError>> + '_
 
                 Some(Ok(res.parsed.into_value()))
             } else {
-                Some(Err(res.unwrap_err()))
+                let mut e = res.unwrap_err();
+
+                let mut line = 1;
+                for (i, ch) in code.chars().enumerate() {
+                    if ch == '\n' {
+                        line += 1;
+                    }
+                    if i == e.index {
+                        break;
+                    }
+                }
+
+                e.line = Some(line);
+
+                Some(Err(e))
             }
         } else {
             None // TODO: Err if we don't parse the whole input?
@@ -60,7 +74,8 @@ impl ParseTree {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     pub msg: String,
-    // pub line: i32,
+    pub index: usize,
+    pub line: Option<usize>,
 }
 
 impl Display for ParseError {
@@ -94,6 +109,8 @@ fn parse_list(code: &str, index: usize) -> ParseResult {
     let mut index = consume(code, index, "(")?;
     let mut members = vec![];
 
+    let start_index = index;
+
     index = consume_whitespace_and_comments(code, index);
 
     while let Some(res) = parse_expression(code, index) {
@@ -114,6 +131,8 @@ fn parse_list(code: &str, index: usize) -> ParseResult {
     } else {
         Some(Err(ParseError {
             msg: format!("Unclosed list at index {}", index),
+            index: start_index,
+            line: None,
         }))
     }
 }
@@ -255,6 +274,8 @@ fn parse_number(code: &str, index: usize) -> ParseResult {
                         "Expected decimal value after '.' at index {}",
                         back_last_index - 1
                     ),
+                    index: back_last_index - 1,
+                    line: None,
                 }));
             }
         }
@@ -292,6 +313,8 @@ fn parse_string(code: &str, index: usize) -> ParseResult {
         } else {
             Some(Err(ParseError {
                 msg: format!("Unclosed string at index {}", last_index),
+                index,
+                line: None,
             }))
         }
     } else {

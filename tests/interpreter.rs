@@ -66,14 +66,14 @@ fn eval_quote_tick_list() {
 
 #[test]
 fn eval_quote_tick_atom() {
-    let result = eval_str("(nth 0 (list '12))");
+    let result = eval_str("(nth (list '12) 0)");
 
     assert_eq!(result, Value::from(Into::<IntType>::into(12)));
 }
 
 #[test]
 fn eval_quote_tick_symbol() {
-    let result = eval_str("(nth 0 (list 'foo))");
+    let result = eval_str("(nth (list 'foo) 0)");
 
     assert_eq!(result, Value::Symbol(Symbol::from_ref("foo")));
 }

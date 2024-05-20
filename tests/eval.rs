@@ -518,7 +518,7 @@ fn test_eval_let_runtime_error() {
             env.clone()
         ),
         Err(RuntimeError {
-            msg: "Could not find symbol: x".to_owned()
+            msg: "Could not find symbol: x\n->[]".to_owned()
         })
     );
 }

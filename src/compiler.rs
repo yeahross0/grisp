@@ -424,15 +424,22 @@ pub fn compile_inner(
                     }
                 }
                 Value::Symbol(keyword) if keyword.as_str() == "if" => {
+                    //let context
                     let args = &list.cdr().into_iter().collect::<Vec<Value>>();
                     let condition = require_arg(keyword, args, 0)
-                        .map_err(|e| CompileError { msg: e.msg })?
+                        .map_err(|e| CompileError {
+                            msg: format!("{} :: Context: {}", e.msg, list),
+                        })?
                         .clone();
                     let then_expr = require_arg(keyword, args, 1)
-                        .map_err(|e| CompileError { msg: e.msg })?
+                        .map_err(|e| CompileError {
+                            msg: format!("{} :: Context: {}", e.msg, list),
+                        })?
                         .clone();
                     let else_expr = require_arg(keyword, args, 2)
-                        .map_err(|e| CompileError { msg: e.msg })?
+                        .map_err(|e| CompileError {
+                            msg: format!("{} :: Context: {}", e.msg, list),
+                        })?
                         .clone();
 
                     compile_inner(
