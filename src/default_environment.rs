@@ -648,6 +648,21 @@ pub fn default_env() -> Env {
     );
 
     env.define(
+        Symbol::from_ref("remainder"),
+        Value::NativeFunc(|_env, args| {
+            let a = require_arg("remainder", &args, 0)?;
+            let b = require_arg("remainder", &args, 1)?;
+
+            (a % b).map_err(|_| RuntimeError {
+                msg: format!(
+                    "Function \"remainder\" requires arguments to be numbers; found {}, {}",
+                    a, b
+                ),
+            })
+        }),
+    );
+
+    env.define(
         Symbol::from_ref("truncate"),
         Value::NativeFunc(|_env, args| {
             let a = require_arg("truncate", &args, 0)?;

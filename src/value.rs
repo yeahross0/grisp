@@ -1,7 +1,7 @@
 use cfg_if::cfg_if;
 use im::Vector;
 use std::any::Any;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Rem, Sub};
 use std::rc::Rc;
 use std::{cell::RefCell, cmp::Ordering};
 use std::{collections::HashMap, fmt::Debug};
@@ -384,6 +384,8 @@ impl PartialEq for Value {
                 },
             ) => this_func == other_func && this_args == other_args,
             (Value::Bytecode(a), Value::Bytecode(b)) => a == b,
+            (Value::Int(this), Value::Float(other)) => *this as FloatType == *other,
+            (Value::Float(this), Value::Int(other)) => *this == *other as FloatType,
             _ => false,
         }
     }
@@ -536,6 +538,34 @@ impl Div<Value> for Value {
     type Output = Result<Value, ()>;
 
     fn div(self, other: Value) -> Self::Output {
+        &self / &other
+    }
+}
+
+impl Rem<&Value> for &Value {
+    type Output = Result<Value, ()>;
+
+    fn rem(self, other: &Value) -> Self::Output {
+        match (self, other) {
+            (Value::Int(this), Value::Int(other)) => Ok(Value::from(this % other)),
+            (Value::Float(this), Value::Float(other)) => Ok(Value::from(this % other)),
+
+            (Value::Int(this), Value::Float(other)) => {
+                Ok(Value::from(int_type_to_float_type(this) % other))
+            }
+            (Value::Float(this), Value::Int(other)) => {
+                Ok(Value::from(this % int_type_to_float_type(other)))
+            }
+
+            _ => Err(()),
+        }
+    }
+}
+
+impl Rem<Value> for Value {
+    type Output = Result<Value, ()>;
+
+    fn rem(self, other: Value) -> Self::Output {
         &self / &other
     }
 }
