@@ -702,3 +702,27 @@ fn test_eval_cond() {
         Value::NIL
     );
 }
+
+#[test]
+fn test_eval_defun_inner_recursive() {
+    let env = Rc::new(RefCell::new(default_env()));
+    op_eval(
+        &compile(
+            lisp! { (defun foo (x) (defun inner (n) (if (< n 0) 0 (inner (- n 1)))) (inner x)) },
+        )
+        .unwrap(),
+        env.clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        op_eval(
+            &compile(lisp! {
+                (foo 5)
+            })
+            .unwrap(),
+            env.clone()
+        )
+        .unwrap(),
+        Value::Int(0)
+    );
+}

@@ -115,10 +115,7 @@ pub fn op_eval_inner(
                         Value::NativeFunc(func) => {
                             let res = func(env.clone(), args);
 
-                            stack.push((
-                                res.map_err(|e| create_runtime_error(e.msg, &call_frames))?,
-                                None,
-                            ));
+                            stack.push((res?, None));
                         }
                         Value::Lambda(lambda) | Value::Macro(lambda) => {
                             let mut body_env = Env::extend(lambda.closure.clone());
@@ -134,11 +131,8 @@ pub fn op_eval_inner(
                                     body_env.define(
                                         *arg_name,
                                         args.get(index)
-                                            .ok_or_else(|| {
-                                                create_runtime_error(
-                                                    format!("No element {}", index),
-                                                    &call_frames,
-                                                )
+                                            .ok_or_else(|| RuntimeError {
+                                                msg: format!("No element {}", index),
                                             })?
                                             .clone(),
                                     );
@@ -162,10 +156,9 @@ pub fn op_eval_inner(
                         _ => {
                             //println!("Unimplemented? {:?}", func);
                             //unimplemented!()
-                            Err(create_runtime_error(
-                                "Error: {} not a function".to_owned(),
-                                &call_frames,
-                            ))?;
+                            Err(RuntimeError {
+                                msg: "Error: {} not a function".to_owned(),
+                            })?;
                         }
                     }
                 }
@@ -227,8 +220,6 @@ pub fn op_eval_inner(
                         .collect();
                     let func = stack.pop().unwrap().0;
 
-                    env.borrow_mut().clear_now();
-
                     match func {
                         Value::Lambda(lambda) => {
                             for (index, arg_name) in lambda.argnames.iter().enumerate() {
@@ -254,24 +245,13 @@ pub fn op_eval_inner(
                         }
                         Value::NativeClosure(closure) => {
                             let res = closure.borrow_mut()(env.clone(), args);
-                            stack.push((
-                                res.map_err(|e| create_runtime_error(e.msg, &call_frames))?,
-                                None,
-                            ));
+                            stack.push((res?, None));
                         }
                         Value::NativeFunc(func) => {
                             let res = func(env.clone(), args);
-                            stack.push((
-                                res.map_err(|e| create_runtime_error(e.msg, &call_frames))?,
-                                None,
-                            ));
+                            stack.push((res?, None));
                         }
-                        _ =>
-                            /*Err(create_runtime_error(
-                            format!("Unable to run: {}", func),
-                            &call_frames,
-                        ))?*/
-                            {}
+                        _ => {}
                     }
                 }
                 Opcode::MakeFunction { arg_count } => {
